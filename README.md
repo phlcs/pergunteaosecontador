@@ -160,6 +160,8 @@ Trocar o provider é instantâneo — apenas mude `AI_PROVIDER` e reinicie o ser
 
 > **Pré-requisito:** conta no Railway ([railway.app](https://railway.app)) com cartão de crédito cadastrado.
 > O deploy em si é feito por você no painel do Railway. Este guia explica cada passo.
+>
+> **Como o build funciona:** Railway detecta automaticamente o Next.js via Nixpacks. Não há Dockerfile, `.dockerignore` nem `railway.toml`. Basta conectar o repositório, adicionar Postgres + Redis e configurar as variáveis de ambiente abaixo.
 
 ### 1. Criar o projeto no Railway
 
@@ -280,7 +282,7 @@ Para filtrar por nível de log, use a busca: `"level":"error"` ou `"level":"warn
 
 ### 11. Healthcheck
 
-O Railway verifica automaticamente o endpoint `/api/health` configurado em `railway.toml`.
+Configure o healthcheck no painel do Railway: **Settings → Healthcheck Path → `/api/health`**.
 
 Para verificar manualmente:
 ```bash
@@ -398,9 +400,6 @@ prisma/
   schema.prisma   Schema (User, Conversation, Message, Booking, Payment, UsageLog)
   migrations/     Migrações versionadas
   seed.ts         Dados de demonstração (só dev/staging)
-railway.toml      Configuração de deploy Railway
-Dockerfile        Multi-stage build (Node 22 Alpine)
-.dockerignore     Arquivos excluídos do build Docker
 docker-compose.yml  Postgres + Redis locais (só dev)
 .env.example      Variáveis necessárias com comentários
 ```
