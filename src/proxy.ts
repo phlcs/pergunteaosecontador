@@ -8,10 +8,10 @@ export function proxy(req: NextRequest) {
   const isAuthenticated = token ? verifyToken(token) !== null : false
 
   if (pathname === '/login' && isAuthenticated) {
-    return NextResponse.redirect(new URL('/', req.url))
+    return NextResponse.redirect(new URL('/app', req.url))
   }
 
-  if (pathname === '/' && !isAuthenticated) {
+  if (pathname.startsWith('/app') && !isAuthenticated) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
@@ -19,5 +19,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/login'],
+  matcher: ['/login', '/app/:path*'],
 }

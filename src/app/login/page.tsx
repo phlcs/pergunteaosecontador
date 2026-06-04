@@ -95,7 +95,7 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/')
+      router.push('/app')
       router.refresh()
     } catch {
       setApiError('Erro de conexão. Verifique sua internet e tente novamente.')
