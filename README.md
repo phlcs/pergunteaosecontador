@@ -258,7 +258,7 @@ railway environment staging  # ou production
 railway run npx prisma migrate deploy
 ```
 
-> Na prática, isso raramente será necessário — o script `build` já inclui `prisma migrate deploy`, que roda automaticamente a cada deploy.
+> Na prática, isso raramente será necessário — o script `start` inclui `prisma migrate deploy`, que roda automaticamente a cada vez que o container sobe. O `build` não acessa o banco (só gera o client e compila o Next.js).
 
 ### 9. Subir o seed em staging (nunca em produção)
 
