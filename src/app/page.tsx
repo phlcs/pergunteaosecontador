@@ -1,8 +1,36 @@
+import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import NavAuthLink from '@/components/NavAuthLink'
 import LandingFaq from '@/components/LandingFaq'
 import ChatFab from '@/components/ChatFab'
+
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://pergunteaoseucontador.com.br'
+
+export const metadata: Metadata = {
+  title: 'Pergunte ao seu Contador — Seu IR resolvido em 1 hora',
+  description:
+    'Sessão individual com um contador de verdade. Diagnóstico fiscal, orientação passo a passo e checklist personalizado. R$ 197, pagamento único, Google Meet.',
+  openGraph: {
+    title: 'Pergunte ao seu Contador — Seu IR resolvido em 1 hora',
+    description:
+      'Sessão individual com um contador de verdade. Diagnóstico fiscal, orientação passo a passo e checklist personalizado. R$ 197, pagamento único.',
+    url: BASE_URL,
+    siteName: 'Pergunte ao seu Contador',
+    locale: 'pt_BR',
+    type: 'website',
+    // TODO: adicionar og:image quando houver uma imagem de compartilhamento
+    // images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Pergunte ao seu Contador — Seu IR resolvido em 1 hora',
+    description:
+      'Sessão individual com um contador de verdade. Diagnóstico fiscal, orientação passo a passo e checklist personalizado.',
+    // TODO: adicionar twitter:image quando houver uma imagem de compartilhamento
+  },
+  alternates: { canonical: BASE_URL },
+}
 
 function CheckIcon() {
   return (
