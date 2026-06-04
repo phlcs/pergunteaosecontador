@@ -1,5 +1,8 @@
+import { cookies } from 'next/headers'
+import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import NavAuthLink from '@/components/NavAuthLink'
 import LandingFaq from '@/components/LandingFaq'
+import ChatFab from '@/components/ChatFab'
 
 const KIWIFY_URL = 'https://pay.kiwify.com.br/7CyqdEm'
 
@@ -11,7 +14,11 @@ function CheckIcon() {
   )
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE_NAME)?.value
+  const isLoggedIn = token ? verifyToken(token) !== null : false
+
   return (
     <div className="landing">
       {/* NAV */}
@@ -64,7 +71,6 @@ export default function LandingPage() {
                 Quero resolver meu IR →
               </a>
             </div>
-            {/* TODO Entrega 3: substituir CTA Kiwify por abertura do chat IA */}
             <a href="#como-funciona" className="hero-how-link fade-up fade-up-d4">
               Como funciona ↓
             </a>
@@ -271,7 +277,6 @@ export default function LandingPage() {
             Agendar minha sessão →
           </a>
           <p className="cta-secure">Pagamento seguro · Pix ou cartão de crédito</p>
-          {/* TODO Entrega 3: substituir CTA Kiwify por abertura do chat IA */}
         </div>
       </section>
 
@@ -291,6 +296,9 @@ export default function LandingPage() {
           <p>© 2025 Pergunte ao seu Contador. Todos os direitos reservados.</p>
         </div>
       </footer>
+
+      {/* FAB — Assistente de IA */}
+      <ChatFab isLoggedIn={isLoggedIn} />
     </div>
   )
 }
