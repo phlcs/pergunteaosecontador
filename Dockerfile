@@ -3,9 +3,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# postinstall runs `prisma generate` — needs schema present
+# prisma generate needs the schema to produce node_modules/.prisma and src/generated
 COPY prisma ./prisma
-COPY src/generated ./src/generated
 
 RUN npm ci --ignore-scripts && npx prisma generate
 
