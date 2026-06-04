@@ -45,6 +45,7 @@ model Booking {
   scheduledAt DateTime
   status      BookingStatus @default(PENDING)
   externalId  String?
+  meetUrl     String?
   createdAt   DateTime      @default(now())
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments    Payment[]

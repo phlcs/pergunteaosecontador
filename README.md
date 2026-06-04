@@ -137,6 +137,64 @@ Em produção, use Upstash ou Railway e aponte `REDIS_URL` para a URL fornecida.
 
 ---
 
+## Como trocar mocks por integrações reais
+
+### Cal.com (agendamento)
+
+1. Crie uma conta em [cal.com](https://cal.com) e configure um Event Type de 1 hora
+2. Gere uma API key em **Settings → Developer → API Keys**
+3. No `.env`:
+   ```
+   CALCOM_MODE=real
+   CALCOM_API_KEY=cal_live_xxxx
+   CALCOM_EVENT_TYPE_ID=12345
+   ```
+4. Implemente `src/lib/integrations/calcom/real.ts`:
+   - `listAvailableSlots(date)` → `GET /v1/availability?...`
+   - `createBooking(input)` → `POST /v1/bookings`
+   - `cancelBooking(id)` → `DELETE /v1/bookings/{id}`
+
+### Kiwify (pagamento)
+
+1. Crie uma conta em [kiwify.com.br](https://kiwify.com.br) e cadastre o produto
+2. Em **Dashboard → Configurações → Integrações**, obtenha as chaves e configure o webhook para apontar para `https://seudominio.com/api/payment/webhook`
+3. No `.env`:
+   ```
+   KIWIFY_MODE=real
+   KIWIFY_PUBLIC_KEY=xxxx
+   KIWIFY_SECRET_KEY=xxxx
+   KIWIFY_PRODUCT_ID=7CyqdEm
+   KIWIFY_WEBHOOK_SECRET=xxxx
+   ```
+4. Implemente `src/lib/integrations/kiwify/real.ts`:
+   - `createCheckout(input)` → gera URL de checkout com o ID do produto Kiwify
+   - `verifyWebhookSignature(payload, signature)` → valida HMAC com `KIWIFY_WEBHOOK_SECRET`
+5. Configure o redirect de pós-pagamento no Kiwify para `https://seudominio.com/booking/success?id={booking_id}`
+
+> **Importante:** Com `KIWIFY_MODE=real`, a rota `/booking/mock-checkout` e `/api/payment/simulate` retornam **404 automaticamente** — proteção contra deploy acidental com simulador ativo.
+
+### Resend (e-mail)
+
+1. Crie uma conta em [resend.com](https://resend.com) e gere uma API key
+2. Verifique seu domínio de envio no painel do Resend
+3. No `.env`:
+   ```
+   RESEND_MODE=real
+   RESEND_API_KEY=re_xxxx
+   RESEND_FROM_EMAIL=contato@seudominio.com.br
+   ```
+4. Implemente `src/lib/integrations/resend/real.ts`:
+   - `sendBookingConfirmation(input)` → `POST https://api.resend.com/emails` com template HTML
+
+### Rotas DEV ONLY
+
+| Rota | Descrição | Desabilitada quando |
+|---|---|---|
+| `/booking/mock-checkout` | Tela fake do Kiwify com botões Aprovar/Recusar | `NODE_ENV=production` ou `KIWIFY_MODE=real` |
+| `POST /api/payment/simulate` | Simula aprovação/recusa de pagamento | `NODE_ENV=production` ou `KIWIFY_MODE=real` |
+
+---
+
 ## Portando para Railway (deploy)
 
 1. Crie um serviço **PostgreSQL** no Railway — copie a `DATABASE_URL` gerada

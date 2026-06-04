@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import BookingModal from '@/components/BookingModal'
 
 /* ----------------------------------------------------------------
    Types
@@ -29,8 +31,6 @@ type LoadingMessage = { id: 'loading'; role: 'ASSISTANT'; loading: true }
 type UIMessage = UserMessage | AssistantMessage | LoadingMessage
 
 type User = { id: string; name: string; email: string }
-
-const KIWIFY_URL = 'https://pay.kiwify.com.br/7CyqdEm'
 
 const STARTERS = [
   'Tenho MEI, recebo como PF também e faço uns freelas por fora. Por onde começo?',
@@ -125,7 +125,13 @@ function InfoIcon() {
 /* ----------------------------------------------------------------
    AssistantBubble — renders structured AI response
    ---------------------------------------------------------------- */
-function AssistantBubble({ content }: { content: AssistantContent }) {
+function AssistantBubble({
+  content,
+  onBook,
+}: {
+  content: AssistantContent
+  onBook: (context: string | null) => void
+}) {
   return (
     <>
       <div className="chat-bubble">
@@ -178,7 +184,7 @@ function AssistantBubble({ content }: { content: AssistantContent }) {
           </div>
           <button
             className="chat-book-cta"
-            onClick={() => window.open(KIWIFY_URL, '_blank', 'noopener,noreferrer')}
+            onClick={() => onBook(content.bookReason ?? null)}
           >
             Agendar sessão →
           </button>
@@ -208,6 +214,8 @@ export default function ChatPage({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [bookingContext, setBookingContext] = useState<string | null | undefined>(undefined)
+  // undefined = closed, null | string = open (null means no context)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
@@ -434,6 +442,15 @@ export default function ChatPage({
      ---------------------------------------------------------------- */
   return (
     <div className="chat-app">
+      {/* Booking modal */}
+      {bookingContext !== undefined && (
+        <BookingModal
+          user={user}
+          context={bookingContext}
+          onClose={() => setBookingContext(undefined)}
+        />
+      )}
+
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div className="chat-sb-backdrop" onClick={() => setSidebarOpen(false)} />
@@ -525,6 +542,15 @@ export default function ChatPage({
               <span className="chat-live-dot" />
               Assistente de contabilidade · online
             </div>
+            <button
+              className="chat-book-header-btn"
+              onClick={() => setBookingContext(null)}
+            >
+              Agendar sessão
+            </button>
+            <Link href="/app/bookings" className="chat-nav-link">
+              Agendamentos
+            </Link>
             <div className="chat-topbar-div" />
             <div className="chat-user-chip">
               <div className="chat-user-av">{initials}</div>
@@ -610,7 +636,10 @@ export default function ChatPage({
                       <div className="chat-msg-avatar chat-msg-avatar-bot">?</div>
                       <div className="chat-msg-body">
                         <div className="chat-msg-who">Assistente de contabilidade</div>
-                        <AssistantBubble content={assistantMsg.content} />
+                        <AssistantBubble
+                          content={assistantMsg.content}
+                          onBook={(ctx) => setBookingContext(ctx)}
+                        />
                       </div>
                     </div>
                   )
