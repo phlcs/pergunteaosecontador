@@ -4,8 +4,6 @@ import NavAuthLink from '@/components/NavAuthLink'
 import LandingFaq from '@/components/LandingFaq'
 import ChatFab from '@/components/ChatFab'
 
-const KIWIFY_URL = 'https://pay.kiwify.com.br/7CyqdEm'
-
 function CheckIcon() {
   return (
     <svg viewBox="0 0 24 24">
@@ -18,6 +16,7 @@ export default async function LandingPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get(COOKIE_NAME)?.value
   const isLoggedIn = token ? verifyToken(token) !== null : false
+  const bookingHref = isLoggedIn ? '/app/chat?action=book' : '/login?next=/app/chat&action=book'
 
   return (
     <div className="landing">
@@ -33,12 +32,7 @@ export default async function LandingPage() {
           </a>
           <div className="nav-actions">
             <NavAuthLink />
-            <a
-              href={KIWIFY_URL}
-              className="btn btn-primary"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={bookingHref} className="btn btn-primary">
               Agendar sessão
             </a>
           </div>
@@ -62,12 +56,7 @@ export default async function LandingPage() {
               sabendo exatamente o que fazer. Sem mensalidade, sem enrolação.
             </p>
             <div className="hero-ctas fade-up fade-up-d3">
-              <a
-                href={KIWIFY_URL}
-                className="btn btn-primary"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={bookingHref} className="btn btn-primary">
                 Quero resolver meu IR →
               </a>
             </div>
@@ -268,12 +257,7 @@ export default async function LandingPage() {
           </p>
           <div className="cta-price">R$ 197</div>
           <div className="cta-price-note">Sessão única de 1 hora · Google Meet</div>
-          <a
-            href={KIWIFY_URL}
-            className="btn btn-primary btn-lg"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href={bookingHref} className="btn btn-primary btn-lg">
             Agendar minha sessão →
           </a>
           <p className="cta-secure">Pagamento seguro · Pix ou cartão de crédito</p>
