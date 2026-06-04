@@ -318,6 +318,46 @@ export default function ChatPage({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId: activeId, message: text }),
         })
+
+        if (res.status === 429) {
+          const err = await res.json().catch(() => ({}))
+          const reason = err?.reason as string | undefined
+          const retryAfter = err?.retryAfterSeconds as number | undefined
+
+          let paragraphs: string[]
+          let suggestBook = false
+          let bookReason: string | null = null
+
+          if (reason === 'user_daily') {
+            paragraphs = [
+              'Você atingiu o limite de 5 perguntas por dia. Volta amanhã, ou agende uma sessão com o Rafael pra tirar todas as dúvidas de uma vez.',
+            ]
+            suggestBook = true
+            bookReason = 'Sessão 1:1 com o contador Rafael pra resolver tudo de uma vez.'
+          } else if (reason === 'global_daily') {
+            paragraphs = [
+              'O assistente atingiu o limite diário de uso geral. Tenta de novo amanhã, ou agende uma sessão direta com o Rafael.',
+            ]
+            suggestBook = true
+            bookReason = 'Atendimento direto com o contador Rafael.'
+          } else {
+            paragraphs = [
+              `Calma! Aguarde ${retryAfter ?? 8} segundo${(retryAfter ?? 8) === 1 ? '' : 's'} antes de enviar outra mensagem.`,
+            ]
+          }
+
+          setMessages((prev) => [
+            ...prev.filter((m) => m.id !== 'loading' && m.id !== 'opt-user'),
+            { id: 'opt-user', role: 'USER' as const, text },
+            {
+              id: 'err',
+              role: 'ASSISTANT' as const,
+              content: { paragraphs, checklist: null, steps: null, suggestBook, bookReason },
+            },
+          ])
+          return
+        }
+
         if (!res.ok) throw new Error()
         const data = await res.json()
 

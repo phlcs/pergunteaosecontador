@@ -8,38 +8,35 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  conversations Conversation[]
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   bookings      Booking[]
+  conversations Conversation[]
   payments      Payment[]
   usageLogs     UsageLog[]
 }
 
 model Conversation {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   title     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
 }
 
 model Message {
-  id             String      @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   role           MessageRole
   content        Json
-  createdAt      DateTime    @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model Booking {
@@ -49,9 +46,8 @@ model Booking {
   status      BookingStatus @default(PENDING)
   externalId  String?
   createdAt   DateTime      @default(now())
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments Payment[]
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments    Payment[]
 }
 
 model Payment {
@@ -62,9 +58,8 @@ model Payment {
   status      PaymentStatus @default(PENDING)
   externalId  String?
   createdAt   DateTime      @default(now())
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  booking Booking? @relation(fields: [bookingId], references: [id])
+  booking     Booking?      @relation(fields: [bookingId], references: [id])
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UsageLog {
@@ -74,8 +69,7 @@ model UsageLog {
   fingerprint String
   action      String
   createdAt   DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user        User?    @relation(fields: [userId], references: [id])
 }
 
 enum MessageRole {

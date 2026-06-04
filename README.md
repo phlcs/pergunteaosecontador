@@ -66,12 +66,74 @@ Ao acessar `/`, você é redirecionado para `/login` caso não esteja autenticad
 
 ---
 
+## Configurando a IA
+
+### Provider Anthropic (padrão)
+
+1. Acesse [console.anthropic.com](https://console.anthropic.com) e crie uma API key
+2. No `.env`, preencha:
+   ```
+   AI_PROVIDER=anthropic
+   ANTHROPIC_API_KEY=sk-ant-...
+   ANTHROPIC_MODEL=claude-haiku-4-5
+   ```
+
+### Provider Google Gemini (alternativo)
+
+1. Acesse [ai.google.dev](https://ai.google.dev) e crie uma API key
+2. No `.env`, preencha:
+   ```
+   AI_PROVIDER=gemini
+   GOOGLE_API_KEY=AIza...
+   GEMINI_MODEL=gemini-2.5-flash
+   ```
+
+Trocar o provider é instantâneo — apenas mude `AI_PROVIDER` e reinicie o servidor.
+
+### Limite de tokens da resposta
+
+Ambos os providers usam `max_tokens = 1200` (hardcoded). Esse valor é um piso técnico — respostas menores que ~800 tokens truncam o JSON estruturado antes de fechar o objeto, quebrando o parse silenciosamente. Não é uma preferência configurável; abaixar esse valor reproduz o bug.
+
+Custo estimado por mensagem (entrada ~700 tokens, saída ~400–500 tokens típica):
+
+| Provider | Modelo | Estimativa por mensagem |
+|---|---|---|
+| Gemini Flash | `gemini-2.5-flash` | ~$0.0003 (~0.003¢) |
+| Anthropic Haiku | `claude-haiku-4-5` | ~$0.002 (~0.02¢) |
+
+> Valores baseados em preços públicos de mid-2025. Verifique [ai.google.dev/pricing](https://ai.google.dev/pricing) e [anthropic.com/pricing](https://www.anthropic.com/pricing) para valores atuais.
+> Com 5 perguntas/usuário/dia e 200 perguntas/dia de limite global, custo máximo diário: ~$0.06 no Gemini, ~$0.40 no Haiku.
+
+### Redis (rate limiting)
+
+O Redis já vem no `docker-compose.yml`. Sobe automaticamente com:
+
+```bash
+docker compose up -d
+```
+
+Em produção, use Upstash ou Railway e aponte `REDIS_URL` para a URL fornecida.
+
+### Limites configuráveis
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `DAILY_USER_LIMIT` | `5` | Perguntas por usuário por dia |
+| `DAILY_GLOBAL_LIMIT` | `200` | Total de perguntas por dia (kill switch) |
+| `MIN_SECONDS_BETWEEN_MESSAGES` | `8` | Intervalo mínimo entre mensagens do mesmo usuário |
+
+---
+
 ## Variáveis de ambiente necessárias
 
 | Variável | Descrição | Exemplo |
 |---|---|---|
 | `DATABASE_URL` | String de conexão do PostgreSQL | `postgresql://contador:contador_dev@localhost:5432/pergunteaosecontador` |
 | `JWT_SECRET` | Segredo para assinar tokens JWT (mín. 32 chars em prod) | `troque-por-segredo-longo...` |
+| `AI_PROVIDER` | Provider de IA | `anthropic` ou `gemini` |
+| `ANTHROPIC_API_KEY` | Chave da API Anthropic | `sk-ant-...` |
+| `GOOGLE_API_KEY` | Chave da API Google | `AIza...` |
+| `REDIS_URL` | URL do Redis | `redis://localhost:6379` |
 
 ---
 
