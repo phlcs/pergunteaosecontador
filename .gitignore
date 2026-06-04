@@ -32,6 +32,9 @@ yarn-error.log*
 *.swp
 *.swo
 
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
 # Sistema
 .DS_Store
 Thumbs.db
@@ -41,3 +44,5 @@ prisma/migrations/dev.db*
 
 # Bundle do Claude Design (só referência local, não vai pro repo)
 _design-bundle/
+
+/src/generated/prisma
