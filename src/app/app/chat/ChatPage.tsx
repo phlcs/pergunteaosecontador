@@ -23,6 +23,8 @@ type AssistantContent = {
   steps: AiStep[] | null
   suggestBook: boolean
   bookReason: string | null
+  /** Card de CTA pra criar conta — usado só no modo anônimo, não vem da API */
+  signupCta?: boolean
 }
 
 type UserMessage = { id: string; role: 'USER'; text: string }
@@ -128,9 +130,11 @@ function InfoIcon() {
 function AssistantBubble({
   content,
   onBook,
+  onSignup,
 }: {
   content: AssistantContent
   onBook: (context: string | null) => void
+  onSignup: () => void
 }) {
   return (
     <>
@@ -190,6 +194,22 @@ function AssistantBubble({
           </button>
         </div>
       )}
+
+      {content.signupCta && (
+        <div className="chat-book-card">
+          <div className="chat-book-avatar">?</div>
+          <div className="chat-book-body">
+            <div className="chat-book-eyebrow">Continue perguntando</div>
+            <div className="chat-book-reason">
+              Gostou? Crie sua conta grátis pra continuar tirando dúvidas — e seu histórico fica salvo.
+            </div>
+            <div className="chat-book-price">Grátis · leva 10 segundos</div>
+          </div>
+          <button className="chat-book-cta" onClick={onSignup}>
+            Criar conta grátis →
+          </button>
+        </div>
+      )}
     </>
   )
 }
@@ -202,11 +222,12 @@ export default function ChatPage({
   initialConversations,
   autoBook = false,
 }: {
-  user: User
+  user: User | null
   initialConversations: ConversationSummary[]
   autoBook?: boolean
 }) {
   const router = useRouter()
+  const isAnon = user === null
 
   const [conversations, setConversations] = useState<ConversationSummary[]>(initialConversations)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -218,19 +239,25 @@ export default function ChatPage({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   // undefined = closed, null | string = open (null means no context)
   const [bookingContext, setBookingContext] = useState<string | null | undefined>(
-    autoBook ? null : undefined
+    autoBook && !isAnon ? null : undefined
   )
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
 
-  const firstName = user.name.split(/\s+/)[0]
-  const initials = user.name
-    .split(/\s+/)
-    .map((w) => w[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  const firstName = user ? user.name.split(/\s+/)[0] : 'visitante'
+  const initials = user
+    ? user.name
+        .split(/\s+/)
+        .map((w) => w[0] ?? '')
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'V'
+
+  const goSignup = useCallback(() => {
+    router.push('/login?next=/app/chat')
+  }, [router])
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -325,10 +352,29 @@ export default function ChatPage({
       ])
 
       try {
+        // Modo anônimo: mandamos history da sessão local (cap 6). Logado: server carrega do banco.
+        const anonHistory = isAnon
+          ? messages
+              .filter((m): m is UserMessage | AssistantMessage => {
+                if (m.role === 'USER') return true
+                return m.role === 'ASSISTANT' && !('loading' in m)
+              })
+              .map((m) =>
+                m.role === 'USER'
+                  ? { role: 'user' as const, content: m.text }
+                  : { role: 'assistant' as const, content: JSON.stringify(m.content) }
+              )
+              .slice(-6)
+          : undefined
+
         const res = await fetch('/api/chat/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId: activeId, message: text }),
+          body: JSON.stringify({
+            conversationId: activeId,
+            message: text,
+            ...(anonHistory ? { history: anonHistory } : {}),
+          }),
         })
 
         if (res.status === 429) {
@@ -339,19 +385,37 @@ export default function ChatPage({
           let paragraphs: string[]
           let suggestBook = false
           let bookReason: string | null = null
+          let signupCta = false
 
-          if (reason === 'user_daily') {
+          if (reason === 'anon_daily' || reason === 'anon_ip') {
+            paragraphs = [
+              'Você chegou ao fim das perguntas grátis. Crie sua conta grátis pra continuar tirando dúvidas — leva 10 segundos.',
+            ]
+            signupCta = true
+          } else if (reason === 'anon_unavailable') {
+            paragraphs = [
+              'Estamos com uma instabilidade momentânea. Crie sua conta grátis pra continuar ou tente de novo daqui a pouco.',
+            ]
+            signupCta = true
+          } else if (reason === 'user_daily') {
             paragraphs = [
               'Você atingiu o limite de 5 perguntas por dia. Volta amanhã, ou agende uma sessão com o Rafael pra tirar todas as dúvidas de uma vez.',
             ]
             suggestBook = true
             bookReason = 'Sessão 1:1 com o contador Rafael pra resolver tudo de uma vez.'
           } else if (reason === 'global_daily') {
-            paragraphs = [
-              'O assistente atingiu o limite diário de uso geral. Tenta de novo amanhã, ou agende uma sessão direta com o Rafael.',
-            ]
-            suggestBook = true
-            bookReason = 'Atendimento direto com o contador Rafael.'
+            if (isAnon) {
+              paragraphs = [
+                'O assistente atingiu o limite diário de uso geral. Crie sua conta grátis pra ser avisado quando reabrir, ou tente de novo amanhã.',
+              ]
+              signupCta = true
+            } else {
+              paragraphs = [
+                'O assistente atingiu o limite diário de uso geral. Tenta de novo amanhã, ou agende uma sessão direta com o Rafael.',
+              ]
+              suggestBook = true
+              bookReason = 'Atendimento direto com o contador Rafael.'
+            }
           } else {
             paragraphs = [
               `Calma! Aguarde ${retryAfter ?? 8} segundo${(retryAfter ?? 8) === 1 ? '' : 's'} antes de enviar outra mensagem.`,
@@ -364,7 +428,14 @@ export default function ChatPage({
             {
               id: 'err',
               role: 'ASSISTANT' as const,
-              content: { paragraphs, checklist: null, steps: null, suggestBook, bookReason },
+              content: {
+                paragraphs,
+                checklist: null,
+                steps: null,
+                suggestBook,
+                bookReason,
+                signupCta,
+              },
             },
           ])
           return
@@ -373,34 +444,41 @@ export default function ChatPage({
         if (!res.ok) throw new Error()
         const data = await res.json()
 
-        setActiveId(data.conversationId)
+        // Modo anônimo: ids vêm nulos (não persistido). Gera ids locais pro React.
+        const rand = () => `anon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const userMsgId = data.userMessageId ?? rand()
+        const assistantMsgId = data.assistantMessageId ?? rand()
+
+        if (data.conversationId) setActiveId(data.conversationId)
 
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== 'loading' && m.id !== 'opt-user'),
-          { id: data.userMessageId, role: 'USER' as const, text },
-          { id: data.assistantMessageId, role: 'ASSISTANT' as const, content: data.response },
+          { id: userMsgId, role: 'USER' as const, text },
+          { id: assistantMsgId, role: 'ASSISTANT' as const, content: data.response },
         ])
 
-        // Update sidebar list
-        const title = text.slice(0, 40) + (text.length > 40 ? '…' : '')
-        setConversations((prev) => {
-          const exists = prev.find((c) => c.id === data.conversationId)
-          if (exists) {
+        // Sidebar só existe no modo logado
+        if (!isAnon && data.conversationId) {
+          const title = text.slice(0, 40) + (text.length > 40 ? '…' : '')
+          setConversations((prev) => {
+            const exists = prev.find((c) => c.id === data.conversationId)
+            if (exists) {
+              return [
+                {
+                  ...exists,
+                  title: exists.title === 'Nova conversa' ? title : exists.title,
+                  updatedAt: Date.now(),
+                  preview: text.slice(0, 60),
+                },
+                ...prev.filter((c) => c.id !== data.conversationId),
+              ]
+            }
             return [
-              {
-                ...exists,
-                title: exists.title === 'Nova conversa' ? title : exists.title,
-                updatedAt: Date.now(),
-                preview: text.slice(0, 60),
-              },
-              ...prev.filter((c) => c.id !== data.conversationId),
+              { id: data.conversationId, title, updatedAt: Date.now(), preview: text.slice(0, 60) },
+              ...prev,
             ]
-          }
-          return [
-            { id: data.conversationId, title, updatedAt: Date.now(), preview: text.slice(0, 60) },
-            ...prev,
-          ]
-        })
+          })
+        }
       } catch {
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== 'loading' && m.id !== 'opt-user'),
@@ -423,7 +501,7 @@ export default function ChatPage({
         setBusy(false)
       }
     },
-    [input, busy, activeId]
+    [input, busy, activeId, isAnon, messages]
   )
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -446,8 +524,8 @@ export default function ChatPage({
      ---------------------------------------------------------------- */
   return (
     <div className="chat-app">
-      {/* Booking modal */}
-      {bookingContext !== undefined && (
+      {/* Booking modal — só faz sentido logado */}
+      {!isAnon && user && bookingContext !== undefined && (
         <BookingModal
           user={user}
           context={bookingContext}
@@ -455,12 +533,13 @@ export default function ChatPage({
         />
       )}
 
-      {/* Mobile backdrop */}
-      {sidebarOpen && (
+      {/* Mobile backdrop (sidebar só existe pra logado) */}
+      {!isAnon && sidebarOpen && (
         <div className="chat-sb-backdrop" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* ---- Sidebar ---- */}
+      {/* ---- Sidebar (só logado) ---- */}
+      {!isAnon && (
       <aside className={`chat-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="chat-sb-head">
           <span className="chat-sb-title">Conversas</span>
@@ -519,19 +598,22 @@ export default function ChatPage({
           )}
         </div>
       </aside>
+      )}
 
       {/* ---- Main area ---- */}
       <div className="chat-main">
         {/* Topbar */}
         <header className="chat-topbar">
           <div className="chat-topbar-left">
-            <button
-              className="chat-sb-toggle"
-              onClick={() => setSidebarOpen((p) => !p)}
-              aria-label="Abrir histórico"
-            >
-              <MenuIcon />
-            </button>
+            {!isAnon && (
+              <button
+                className="chat-sb-toggle"
+                onClick={() => setSidebarOpen((p) => !p)}
+                aria-label="Abrir histórico"
+              >
+                <MenuIcon />
+              </button>
+            )}
             <a href="/" className="chat-brand" title="Voltar ao site">
               <div className="chat-brand-icon">?</div>
               <div className="chat-brand-text">
@@ -546,26 +628,39 @@ export default function ChatPage({
               <span className="chat-live-dot" />
               Assistente de contabilidade · online
             </div>
-            <button
-              className="chat-book-header-btn"
-              onClick={() => setBookingContext(null)}
-            >
-              Agendar sessão
-            </button>
-            <Link href="/app/bookings" className="chat-nav-link">
-              Agendamentos
-            </Link>
-            <div className="chat-topbar-div" />
-            <div className="chat-user-chip">
-              <div className="chat-user-av">{initials}</div>
-              <div className="chat-user-meta">
-                <span className="chat-user-name">{user.name}</span>
-                <span className="chat-user-state">Conectado</span>
-              </div>
-            </div>
-            <button className="chat-logout-btn" onClick={handleLogout}>
-              Sair
-            </button>
+            {isAnon ? (
+              <>
+                <Link href="/login?next=/app/chat" className="chat-nav-link">
+                  Entrar
+                </Link>
+                <button className="chat-book-header-btn" onClick={goSignup}>
+                  Criar conta grátis
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="chat-book-header-btn"
+                  onClick={() => setBookingContext(null)}
+                >
+                  Agendar sessão
+                </button>
+                <Link href="/app/bookings" className="chat-nav-link">
+                  Agendamentos
+                </Link>
+                <div className="chat-topbar-div" />
+                <div className="chat-user-chip">
+                  <div className="chat-user-av">{initials}</div>
+                  <div className="chat-user-meta">
+                    <span className="chat-user-name">{user!.name}</span>
+                    <span className="chat-user-state">Conectado</span>
+                  </div>
+                </div>
+                <button className="chat-logout-btn" onClick={handleLogout}>
+                  Sair
+                </button>
+              </>
+            )}
           </div>
         </header>
 
@@ -584,10 +679,14 @@ export default function ChatPage({
               /* ---- Empty / ready state ---- */
               <div className="chat-ready">
                 <div className="chat-ready-head">
-                  Oi, {firstName} — sobre o que é a sua dúvida?
+                  {isAnon
+                    ? 'Oi! Sobre o que é a sua dúvida?'
+                    : `Oi, ${firstName} — sobre o que é a sua dúvida?`}
                 </div>
                 <p className="chat-ready-sub">
-                  Escolha uma sugestão ou escreva sua pergunta no campo abaixo.
+                  {isAnon
+                    ? 'Você tem 2 perguntas grátis pra experimentar — depois, é só criar sua conta.'
+                    : 'Escolha uma sugestão ou escreva sua pergunta no campo abaixo.'}
                 </p>
                 <div className="chat-starters-label">Comece por uma destas</div>
                 <div className="chat-starters">
@@ -643,6 +742,7 @@ export default function ChatPage({
                         <AssistantBubble
                           content={assistantMsg.content}
                           onBook={(ctx) => setBookingContext(ctx)}
+                          onSignup={goSignup}
                         />
                       </div>
                     </div>
