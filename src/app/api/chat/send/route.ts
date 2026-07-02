@@ -1,14 +1,38 @@
 import { createHash } from 'crypto'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import {
+  verifyToken,
+  COOKIE_NAME,
+  ANON_COOKIE_NAME,
+  readAnonId,
+  makeAnonId,
+  makeAnonCookie,
+} from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { chatComplete } from '@/lib/ai'
 import { validateInput } from '@/lib/ai/validate-input'
 import { SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 import { FALLBACK_RESPONSE, BLOCKED_RESPONSE, type AiResponse } from '@/lib/ai/schema'
-import { checkRateLimit } from '@/lib/ratelimit'
+import { checkRateLimit, checkAnonRateLimit } from '@/lib/ratelimit'
 import { logger } from '@/lib/logger'
+
+type HistoryMessage = { role: 'user' | 'assistant'; content: string }
+
+const MAX_HISTORY = 6
+
+function parseClientHistory(raw: unknown): HistoryMessage[] {
+  if (!Array.isArray(raw)) return []
+  const out: HistoryMessage[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const it = item as { role?: unknown; content?: unknown }
+    if ((it.role === 'user' || it.role === 'assistant') && typeof it.content === 'string') {
+      out.push({ role: it.role, content: it.content })
+    }
+  }
+  return out.slice(-MAX_HISTORY)
+}
 
 /* ----------------------------------------------------------------
    Helpers
@@ -96,12 +120,14 @@ async function persistMessages(
    ---------------------------------------------------------------- */
 
 export async function POST(req: NextRequest) {
-  // 1. Auth
+  // 1. Auth — se tem token válido segue fluxo logado; senão desvia pra anônimo
   const cookieStore = await cookies()
   const token = cookieStore.get(COOKIE_NAME)?.value
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const payload = verifyToken(token)
-  if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const payload = token ? verifyToken(token) : null
+  if (!payload) {
+    const anonCookieValue = cookieStore.get(ANON_COOKIE_NAME)?.value
+    return handleAnon(req, anonCookieValue)
+  }
 
   // 2. Parse body
   let body: { message?: unknown; conversationId?: unknown }
@@ -250,4 +276,115 @@ export async function POST(req: NextRequest) {
     assistantMessageId: assistantMsg.id,
     response: aiResponse,
   })
+}
+
+/* ----------------------------------------------------------------
+   Anonymous flow — 2 perguntas grátis por cookie, sem persistência.
+   History vem do body (cap 6). Rate limit fail-closed.
+   ---------------------------------------------------------------- */
+
+async function handleAnon(
+  req: NextRequest,
+  anonCookieValue: string | undefined
+): Promise<NextResponse> {
+  // 1. Resolve / issue anonId
+  let anonId = anonCookieValue ? readAnonId(anonCookieValue) : null
+  let anonCookieToSet: string | null = null
+  if (!anonId) {
+    anonId = makeAnonId()
+    anonCookieToSet = makeAnonCookie(anonId)
+  }
+
+  const attachCookie = (res: NextResponse): NextResponse => {
+    if (anonCookieToSet) res.headers.set('Set-Cookie', anonCookieToSet)
+    return res
+  }
+
+  // 2. Parse body
+  let body: { message?: unknown; history?: unknown }
+  try {
+    body = await req.json()
+  } catch {
+    return attachCookie(NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }))
+  }
+
+  const { message, history: rawHistory } = body as {
+    message: unknown
+    history: unknown
+  }
+
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return attachCookie(NextResponse.json({ error: 'message is required' }, { status: 400 }))
+  }
+
+  const text = message.trim()
+
+  // 3. IP + fingerprint
+  const ip = extractIp(req)
+  const fingerprint = makeFingerprint(ip, req.headers.get('user-agent') ?? '')
+
+  // 4. Validate input (anti-injection). Blocked → BLOCKED_RESPONSE sem consumir cota.
+  const inputCheck = validateInput(text)
+  if (!inputCheck.ok) {
+    return attachCookie(
+      NextResponse.json({
+        conversationId: null,
+        userMessageId: null,
+        assistantMessageId: null,
+        response: BLOCKED_RESPONSE,
+      })
+    )
+  }
+
+  // 5. Rate limit (fail-closed pro anônimo)
+  const rateResult = await checkAnonRateLimit({ anonId, ip })
+  if (!rateResult.ok) {
+    return attachCookie(
+      NextResponse.json(
+        {
+          error: 'rate_limited',
+          reason: rateResult.reason,
+          retryAfterSeconds:
+            'retryAfterSeconds' in rateResult ? rateResult.retryAfterSeconds : undefined,
+        },
+        { status: 429 }
+      )
+    )
+  }
+
+  // 6. History vem do cliente (contexto de sessão), cap 6
+  const history = parseClientHistory(rawHistory)
+
+  // 7. Call LLM
+  let aiResponse: AiResponse
+  try {
+    aiResponse = await chatComplete({ systemPrompt: SYSTEM_PROMPT, history, userMessage: text })
+  } catch (err) {
+    logger.error('chat/send: chatComplete threw unexpectedly (anon)', {
+      anonId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    aiResponse = FALLBACK_RESPONSE
+  }
+
+  // 8. UsageLog (telemetria opcional — não persistimos Conversation/Message)
+  try {
+    await prisma.usageLog.create({
+      data: { userId: null, ip, fingerprint, action: 'chat_anon' },
+    })
+  } catch (err) {
+    logger.warn('chat/send: usageLog (anon) failed — ignoring', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  // 9. Return (mesmo shape do logado; ids nulos porque não persistiu)
+  return attachCookie(
+    NextResponse.json({
+      conversationId: null,
+      userMessageId: null,
+      assistantMessageId: null,
+      response: aiResponse,
+    })
+  )
 }
