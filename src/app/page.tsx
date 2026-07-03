@@ -107,7 +107,7 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;padding:
 .hero{position:relative;padding:64px 0 80px}
 .hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
 .hero-l{position:relative;z-index:2}
-.hero-stamps{display:flex;gap:10px;margin-bottom:24px}
+.hero-stamps{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
 .hero h1{font-family:var(--f-head);font-weight:900;font-size:clamp(40px,6vw,68px);line-height:.98;letter-spacing:-.02em;margin-bottom:22px}
 .hero h1 .line2{font-weight:700}
 .hero-sub{font-size:19px;color:var(--ink-soft);max-width:460px;margin-bottom:30px}
@@ -142,7 +142,7 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;padding:
 .handoff .hi{width:30px;height:30px;border-radius:8px;background:var(--ink);color:var(--butter);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:900}
 .float-stamp{position:absolute;z-index:4;opacity:0}
 .fs1{top:-18px;right:6px;animation:pop .5s ease .7s both,floaty 5s ease 1.2s infinite;--rot:6deg;transform:rotate(6deg)}
-.fs2{bottom:64px;left:-30px;animation:pop .5s ease 1s both,floaty 5.5s ease 1.5s infinite;--rot:-7deg;transform:rotate(-7deg)}
+.fs2{top:96px;left:-32px;animation:pop .5s ease 1s both,floaty 5.5s ease 1.5s infinite;--rot:-7deg;transform:rotate(-7deg)}
 
 /* COMPARE (dark petrol) */
 .compare{background:var(--ink);color:var(--cream);padding:78px 0;position:relative}
@@ -295,8 +295,8 @@ export default function LandingPage() {
         <div className="wrap">
           <div className="hero-l">
             <div className="hero-stamps">
-              <span className="stamp stamp-green r r1">Pergunte grátis</span>
-              <span className="stamp stamp-butter r r2">Sem mensalidade</span>
+              <span className="stamp stamp-green r r1">IA Contábil Gratuita</span>
+              <span className="stamp stamp-butter r r2">Consulta sem mensalidade</span>
             </div>
             <h1 className="r r2">
               Imposto deu nó?
@@ -306,8 +306,10 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="hero-sub r r3">
-              A IA do Rafael te ajuda a entender o caminho <b>de graça</b>. Se tiver dinheiro, risco
-              ou Receita no meio, o <b>Rafael de verdade</b> olha com você.
+              Tributarista, formado pelo IBMEC, <b>Rafael Santa Rosa</b> pode te ajudar a resolver
+              suas dificuldades financeiras com uma IA construída por ele, <b>100% grátis</b>. Tudo
+              que a IA puder fazer, ela vai. Caso precise de uma consulta paga, ele tá aqui para te
+              ajudar também.
             </p>
             <div className="hero-cta r r4">
               <Link href="/app/chat" className="btn btn-primary">
@@ -350,7 +352,7 @@ export default function LandingPage() {
           <div className="hero-r">
             <div className="chat-panel" />
             <span className="stamp stamp-butter float-stamp fs1">Humano quando importa</span>
-            <span className="stamp stamp-green float-stamp fs2">100% grátis</span>
+            <span className="stamp stamp-green float-stamp fs2">IA 100% grátis</span>
             <div className="chat">
               <div className="chat-head">
                 <div className="chat-av">R</div>
